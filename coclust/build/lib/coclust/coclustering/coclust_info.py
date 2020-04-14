@@ -70,6 +70,7 @@ class CoclustInfo(BaseNonDiagonalCoclust):
         self.n_col_clusters = n_col_clusters
         self.init = init
         self.max_iter = max_iter
+        print('Max Iterations:', max_iter)
         self.n_init = n_init
         self.tol = tol
         self.random_state = random_state
@@ -225,7 +226,7 @@ class CoclustInfo(BaseNonDiagonalCoclust):
             ## <<-- here -->>
             # Imputation
             if (self.missing is not None):
-                print('Step 2++, Iteration :',20-n_iters)
+                print('Iteration :',21-n_iters,'<< -- Imputation -- >>')
                 self._impute(X, p_kl, Z=Z, W=W)
 
             # Update W
@@ -264,7 +265,6 @@ class CoclustInfo(BaseNonDiagonalCoclust):
             ## <<-- here -->>
             # Imputation 
             if self.missing is not None:
-                print('Step 4++, Iteration :',20-n_iters)
                 self._impute(X, p_kl, Z=Z, W=W)
 
             # Criterion

@@ -1,10 +1,10 @@
 library(rmatio)
 library(missMDA)
-library(mice)
+#library(mice)
 
 webACE <- read.mat('datasets/WebACE.mat')
 #webACE$fea
-amputeWebACE <- ampute(webACE$fea, 0.3)
+#amputeWebACE <- ampute(webACE$fea, 0.3)
 
 # Data : Données
 # tauxMissing : % de données missing (valeurs entre 0 et 1 avec 0.5 = 50%)
@@ -21,7 +21,6 @@ genMissingData <- function(datas, tauxMissing = 0.3) {
   datas[x] = NA
   print(sum(is.na(datas)))
   return(datas)
-  
 }
 
 
@@ -33,7 +32,7 @@ res <- imputeCA(missWebACE)
 which(is.na(amputeWebACE$amp), arr.ind=TRUE)
 
 write.mat(as.data.frame(NAs),'NaNs.mat')
-
+write.csv(as.data.frame(res),'MissWebACE.csv', row.names = F)
 
 
 
