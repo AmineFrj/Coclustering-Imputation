@@ -6,7 +6,7 @@ webACE <- read.mat('datasets/WebACE.mat')
 #webACE$fea
 #amputeWebACE <- ampute(webACE$fea, 0.3)
 
-# Data : Données
+# Data
 # tauxMissing : % de données missing (valeurs entre 0 et 1 avec 0.5 = 50%)
 genMissingData <- function(datas, tauxMissing = 0.3) {
   print("just check if 2 next numbers are equals...")

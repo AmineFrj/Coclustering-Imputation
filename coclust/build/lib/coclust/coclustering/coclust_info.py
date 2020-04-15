@@ -109,13 +109,13 @@ class CoclustInfo(BaseNonDiagonalCoclust):
         row_labels_ = self.row_labels_
         column_labels_ = self.column_labels_
         delta_kl_ = self.delta_kl_
-
-        ##self.missing = np.argwhere(np.isnan(X)).tolist()
         
+        ##self.missing = np.argwhere(np.isnan(X)).tolist()
+        self.X = X
 
         seeds = random_state.randint(np.iinfo(np.int32).max, size=self.n_init)
         for seed in seeds:
-            self._fit_single(X, seed, y)
+            self._fit_single(self.X, seed, y)
             if np.isnan(self.criterion):
                 raise ValueError("matrix may contain negative or "
                                  "unexpected NaN values")
@@ -154,19 +154,19 @@ class CoclustInfo(BaseNonDiagonalCoclust):
         else:
             W = np.matrix(self.init, dtype=float)
 
-        X = sp.csr_matrix(X)
+        self.X = sp.csr_matrix(self.X)
 
-        N = float(X.sum())
-        X = X.multiply(1. / N)
+        self.N = float(self.X.sum())
+        self.X = self.X.multiply(1. / self.N)
 
         Z = sp.lil_matrix(random_init(K, X.shape[0], self.random_state))
 
         W = sp.csr_matrix(W)
 
         # Initial delta
-        p_il = X * W
+        p_il = self.X * W
         # p_il = p_il     # matrix m,l ; column l' contains the p_il'
-        p_kj = X.T * Z  # matrix j,k
+        p_kj = self.X.T * Z  # matrix j,k
         p_kd = p_kj.sum(axis=0)  # array containing the p_k.
         p_dl = p_il.sum(axis=0)  # array containing the p_.l
 
@@ -178,7 +178,7 @@ class CoclustInfo(BaseNonDiagonalCoclust):
         p_kd_times_p_dl[p_kd_times_p_dl == 0.] = min_p_kd_times_p_dl * 0.01
         p_kd_times_p_dl_inv = 1. / p_kd_times_p_dl
 
-        p_kl = (Z.T * X) * W
+        p_kl = (Z.T * self.X) * W
         delta_kl = p_kl.multiply(p_kd_times_p_dl_inv)
 
         change = True
@@ -192,7 +192,7 @@ class CoclustInfo(BaseNonDiagonalCoclust):
             change = False
 
             # Update Z
-            p_il = X * W  # matrix m,l ; column l' contains the p_il'
+            p_il = self.X * W  # matrix m,l ; column l' contains the p_il'
             if not isdense(delta_kl):
                 delta_kl = delta_kl.todense()
             delta_kl[delta_kl == 0.] = 0.0001  # to prevent log(0)
@@ -208,7 +208,7 @@ class CoclustInfo(BaseNonDiagonalCoclust):
 
             # Update delta
             # matrice d, k ; column k' contains the p_jk'
-            p_kj = X.T * Z
+            p_kj = self.X.T * Z
             # p_il unchanged
             p_dl = p_il.sum(axis=0)  # array l containing the  p_.l
             p_kd = p_kj.sum(axis=0)  # array k containing the p_k.
@@ -220,17 +220,19 @@ class CoclustInfo(BaseNonDiagonalCoclust):
                     np.nonzero(p_kd_times_p_dl)])
             p_kd_times_p_dl[p_kd_times_p_dl == 0.] = min_p_kd_times_p_dl * 0.01
             p_kd_times_p_dl_inv = 1. / p_kd_times_p_dl
-            p_kl = (Z.T * X) * W
+            p_kl = (Z.T * self.X) * W
             delta_kl = p_kl.multiply(p_kd_times_p_dl_inv)
 
             ## <<-- here -->>
             # Imputation
             if (self.missing is not None):
-                print('Iteration :',21-n_iters,'<< -- Imputation -- >>')
-                self._impute(X, p_kl, Z=Z, W=W)
+                print('Iteration :',self.max_iter+1-n_iters,' -- With Imputation -- ')
+                self._impute(p_kl=p_kl, Z=Z, W=W)
+            else:
+                print('Iteration :',self.max_iter+1-n_iters,' -- Without Imputation -- ')
 
             # Update W
-            p_kj = X.T * Z  # matrice m,l ; column l' contains the p_il'
+            p_kj = self.X.T * Z  # matrice m,l ; column l' contains the p_il'
             if not isdense(delta_kl):
                 delta_kl = delta_kl.todense()
             delta_kl[delta_kl == 0.] = 0.0001  # to prevent log(0)
@@ -243,7 +245,7 @@ class CoclustInfo(BaseNonDiagonalCoclust):
             W = sp.lil_matrix(W)
 
             # Update delta
-            p_il = X * W     # matrix d,k ; column k' contains the p_jk'
+            p_il = self.X * W     # matrix d,k ; column k' contains the p_jk'
             # p_kj unchanged
             p_dl = p_il.sum(axis=0)  # array l containing the p_.l
             p_kd = p_kj.sum(axis=0)  # array k containing the p_k.
@@ -255,7 +257,7 @@ class CoclustInfo(BaseNonDiagonalCoclust):
                     np.nonzero(p_kd_times_p_dl)])
             p_kd_times_p_dl[p_kd_times_p_dl == 0.] = min_p_kd_times_p_dl * 0.01
             p_kd_times_p_dl_inv = 1. / p_kd_times_p_dl
-            p_kl = (Z.T * X) * W
+            p_kl = (Z.T * self.X) * W
 
             delta_kl = p_kl.multiply(p_kd_times_p_dl_inv)
             # to prevent log(0) when computing criterion
@@ -265,7 +267,7 @@ class CoclustInfo(BaseNonDiagonalCoclust):
             ## <<-- here -->>
             # Imputation 
             if self.missing is not None:
-                self._impute(X, p_kl, Z=Z, W=W)
+                self._impute(p_kl=p_kl, Z=Z, W=W)
 
             # Criterion
             pkl_mi = sp.lil_matrix(p_kl).multiply(
@@ -288,7 +290,9 @@ class CoclustInfo(BaseNonDiagonalCoclust):
         ## Save pkl
         self.p_kl = p_kl
 
-    def _impute(self, X, p_kl, Z, W):
+        self.X = self.X.multiply(self.N)
+
+    def _impute(self, p_kl, Z, W):
         """Imputes missing values from given indexes
 
         Parameters
@@ -300,13 +304,14 @@ class CoclustInfo(BaseNonDiagonalCoclust):
         for i in range(coclust_n.shape[0]):
             for j in range(coclust_n.shape[1]):
                 coclust_n[i,j] = np.sum(Z[:,i])*np.sum(W[:,j])
-        #print('Done with coclust_n !', np.sum(coclust_n))
-        self.Z=Z
-        self.W=W
-        N = np.sum(coclust_n)
+
         # To modify X values use lil_matrix much efficient
-        X = sp.lil_matrix(X)
+        self.X = self.X.multiply(self.N)
+        self.X = sp.lil_matrix(self.X)
+        print(self.X.sum())
         for i in self.missing.values:
             cluster_row = Z[i[0],:].todense().tolist()[0].index(1)
             cluster_col = W[i[1],:].todense().tolist()[0].index(1)
-            X[i[0],i[1]] = p_kl[cluster_row, cluster_col]*N/coclust_n[cluster_row, cluster_col]
+            self.X[i[0],i[1]] = p_kl[cluster_row, cluster_col]*self.N/coclust_n[cluster_row, cluster_col]
+        self.N = float(self.X.sum())
+        self.X = self.X.multiply(1. / self.N)

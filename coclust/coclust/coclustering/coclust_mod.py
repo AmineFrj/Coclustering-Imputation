@@ -65,7 +65,7 @@ class CoclustMod(BaseDiagonalCoclust):
     Direct Maximization of Graph Modularity. CIKM 2015: 1807-1810
     """
 
-    def __init__(self, n_clusters=2, init=None, max_iter=20, n_init=1,
+    def __init__(self, n_clusters=2, init=None, max_iter=20, n_init=1, missing_indexes=None,
                  tol=1e-9, random_state=None):
         self.n_clusters = n_clusters
         self.init = init
@@ -78,6 +78,8 @@ class CoclustMod(BaseDiagonalCoclust):
         self.column_labels_ = None
         self.modularity = -np.inf
         self.modularities = []
+
+        self.missing = missing_indexes
 
     def fit(self, X, y=None):
         """Perform co-clustering by direct maximization of graph modularity.
@@ -94,7 +96,10 @@ class CoclustMod(BaseDiagonalCoclust):
                     copy=False, force_all_finite=True, ensure_2d=True,
                     allow_nd=False, ensure_min_samples=self.n_clusters,
                     ensure_min_features=self.n_clusters,
-                    warn_on_dtype=False, estimator=None)
+                    # warn_on_dtype=False, 
+                    # FutureWarning: 'warn_on_dtype' is deprecated in version 0.21 
+                    # and will be removed in 0.23. Don't set `warn_on_dtype` to remove this warning.
+                    estimator=None)
 
         if type(X) == np.ndarray:
             X = np.matrix(X)
@@ -105,10 +110,11 @@ class CoclustMod(BaseDiagonalCoclust):
         modularities = []
         row_labels_ = None
         column_labels_ = None
+        self.X = X
 
         seeds = random_state.randint(np.iinfo(np.int32).max, size=self.n_init)
         for seed in seeds:
-            self._fit_single(X, seed, y)
+            self._fit_single(self.X, seed, y)
             if np.isnan(self.modularity):
                 raise ValueError("matrix may contain unexpected NaN values")
             # remember attributes corresponding to the best modularity
@@ -144,13 +150,13 @@ class CoclustMod(BaseDiagonalCoclust):
         Z = np.zeros((X.shape[0], self.n_clusters))
 
         # Compute the modularity matrix
-        row_sums = np.matrix(X.sum(axis=1))
-        col_sums = np.matrix(X.sum(axis=0))
-        N = float(X.sum())
+        row_sums = np.matrix(self.X.sum(axis=1))
+        col_sums = np.matrix(self.X.sum(axis=0))
+        N = float(self.X.sum())
         indep = (row_sums.dot(col_sums)) / N
 
         # B is a numpy matrix
-        B = X - indep
+        B = self.X - indep
 
         self.modularities = []
 
@@ -166,12 +172,21 @@ class CoclustMod(BaseDiagonalCoclust):
             for idx, k in enumerate(np.argmax(BW, axis=1)):
                 Z[idx, :] = 0
                 Z[idx, k] = 1
+            # Imputation
+            if (self.missing is not None):
+                print('Iteration :',iteration,' -- With Imputation -- ')
+                self._impute(Z=Z, W=W)
+            else:
+                print('Iteration :',iteration,' -- Without Imputation -- ')
 
             # Reassign columns
             BtZ = (B.T).dot(Z)
             for idx, k in enumerate(np.argmax(BtZ, axis=1)):
                 W[idx, :] = 0
                 W[idx, k] = 1
+            # Imputation
+            if (self.missing is not None):
+                self._impute(Z=Z, W=W)
 
             k_times_k = (Z.T).dot(BW)
             m_end = np.trace(k_times_k)
@@ -188,6 +203,32 @@ class CoclustMod(BaseDiagonalCoclust):
         self.bw = BW
         self.modularity = m_end / N
         self.nb_iterations = iteration
+
+    def _impute(self, Z, W):
+        """Imputes missing values from given indexes
+
+        Parameters
+        ----------
+        
+        """
+        A = np.zeros((self.n_clusters,self.n_clusters))
+        for i in range(self.n_clusters):
+            Z_ind = np.where(Z[:,i] == 1)
+            for j in range(self.n_clusters):
+                W_ind = np.where(W[:,j] == 1)
+                row_idx = Z_ind[0]
+                col_idx = W_ind[0]
+                tmp = self.X[row_idx[:, None], col_idx]
+                if len(tmp) and tmp.sum() > 0:
+                    A[i,j] = tmp.mean()
+                else :
+                    A[i,j] = 0
+        A = np.nan_to_num(A)
+        # To modify X values use lil_matrix much efficient
+        for i in self.missing.values:
+            cluster_row = Z[i[0],:].tolist().index(1)
+            cluster_col = W[i[1],:].tolist().index(1)
+            self.X[i[0],i[1]] = A[cluster_row, cluster_col]
 
     def get_assignment_matrix(self, kind, i):
         """Returns the indices of 'best' i cols of an assignment matrix
