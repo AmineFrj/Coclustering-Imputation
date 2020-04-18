@@ -13,6 +13,9 @@ of a co-clustering algorithm by direct maximization of graph modularity.
 import numpy as np
 from sklearn.utils import check_random_state, check_array
 
+import time
+import sys
+
 from ..initialization import random_init
 from .base_diagonal_coclust import BaseDiagonalCoclust
 
@@ -130,6 +133,11 @@ class CoclustMod(BaseDiagonalCoclust):
         self.row_labels_ = row_labels_
         self.column_labels_ = column_labels_
 
+        if (self.missing is not None):
+            sys.stdout.write('\rProgress: ['+'='*16+']   ## With Imputation ##\n')
+        else:
+            sys.stdout.write('\rProgress: ['+'='*16+']   ## Without Imputation ##\n')
+
         return self
 
     def _fit_single(self, X, random_state, y=None):
@@ -173,11 +181,12 @@ class CoclustMod(BaseDiagonalCoclust):
                 Z[idx, :] = 0
                 Z[idx, k] = 1
             # Imputation
+            prog = int(iteration*16/self.max_iter)
             if (self.missing is not None):
-                print('Iteration :',iteration,' -- With Imputation -- ')
+                sys.stdout.write('\rProgress: ['+'='*prog+'>'+' '*(15-prog)+']   ## With Imputation ##')
                 self._impute(Z=Z, W=W)
             else:
-                print('Iteration :',iteration,' -- Without Imputation -- ')
+                sys.stdout.write('\rProgress: ['+'='*prog+'>'+' '*(15-prog)+']   ## Without Imputation ##')
 
             # Reassign columns
             BtZ = (B.T).dot(Z)

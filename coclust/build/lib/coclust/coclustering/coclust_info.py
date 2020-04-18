@@ -15,6 +15,9 @@ import scipy.sparse as sp
 from scipy.sparse.sputils import isdense
 from sklearn.utils import check_random_state, check_array
 
+import time
+import sys
+
 from ..initialization import random_init
 from .base_non_diagonal_coclust import BaseNonDiagonalCoclust
 from ..io.input_checking import check_positive
@@ -135,6 +138,12 @@ class CoclustInfo(BaseNonDiagonalCoclust):
         self.column_labels_ = column_labels_
         self.delta_kl_ = delta_kl_
 
+        if (self.missing is not None):
+            sys.stdout.write('\rProgress: ['+'='*16+']   ## With Imputation ##\n')
+        else:
+            sys.stdout.write('\rProgress: ['+'='*16+']   ## Without Imputation ##\n')
+
+
         return self
 
     def _fit_single(self, X, random_state, y=None):
@@ -225,11 +234,13 @@ class CoclustInfo(BaseNonDiagonalCoclust):
 
             ## <<-- here -->>
             # Imputation
+            it = self.max_iter-n_iters
+            prog = int(it*16/self.max_iter)
             if (self.missing is not None):
-                print('Iteration :',self.max_iter+1-n_iters,' -- With Imputation -- ')
+                sys.stdout.write('\rProgress: ['+'='*prog+'>'+' '*(15-prog)+']   ## With Imputation ##')
                 self._impute(p_kl=p_kl, Z=Z, W=W)
             else:
-                print('Iteration :',self.max_iter+1-n_iters,' -- Without Imputation -- ')
+                sys.stdout.write('\rProgress: ['+'='*prog+'>'+' '*(15-prog)+']   ## Without Imputation ##')
 
             # Update W
             p_kj = self.X.T * Z  # matrice m,l ; column l' contains the p_il'
@@ -308,7 +319,6 @@ class CoclustInfo(BaseNonDiagonalCoclust):
         # To modify X values use lil_matrix much efficient
         self.X = self.X.multiply(self.N)
         self.X = sp.lil_matrix(self.X)
-        print(self.X.sum())
         for i in self.missing.values:
             cluster_row = Z[i[0],:].todense().tolist()[0].index(1)
             cluster_col = W[i[1],:].todense().tolist()[0].index(1)
